@@ -20,7 +20,7 @@ A real-time web dashboard that monitors maritime traffic in the Port of Lisbon a
 
 1. Clone this repository:
    ```bash
-   git clone [https://github.com/Diogo5059/nome-do-teu-repositorio.git](https://github.com/Diogo5059/nome-do-teu-repositorio.git)
+   git clone [https://github.com/Diogo5059/dashboard-maritimo-lisboa.git](https://github.com/Diogo5059/dashboard-maritimo-lisboa.git)
 2. Create a free account at AISStream.io to get an API key.
 3. Open the index.html file in your text editor and replace "API-KEY" with your actual API key.
 4. Open the index.html file in any modern web browser. No local server is required!
