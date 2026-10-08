@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitor de Tráfego Marítimo - Lisboa</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100vw; }
+        .dashboard-panel {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 220px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-panel">
+        <h3 style="margin: 0 0 8px 0;">Porto de Lisboa</h3>
+        <p style="margin: 0;">Navios ativos: <strong id="ship-count">0</strong></p>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Coordenadas centradas no estuário do Tejo
+        const map = L.map('map').setView([38.69, -9.25], 11);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markers = {};
+
+        // Exemplo de função para atualizar ou criar marcador
+        function updateShip(mmsi, name, lat, lon, sog, cog) {
+            const popupContent = `<b>${name}</b><br>MMSI: ${mmsi}<br>Velocidade: ${sog} nós<br>Rumo: ${cog}°`;
+
+            if (markers[mmsi]) {
+                markers[mmsi].setLatLng([lat, lon]).setPopupContent(popupContent);
+            } else {
+                markers[mmsi] = L.circleMarker([lat, lon], {
+                    radius: 6,
+                    color: '#0055aa',
+                    fillColor: '#0088ff',
+                    fillOpacity: 0.8
+                }).bindPopup(popupContent).addTo(map);
+            }
+            document.getElementById('ship-count').innerText = Object.keys(markers).length;
+        }
+        // Ligação direta do browser à AISStream
+        const socket = new WebSocket("wss://stream.aisstream.io/v0/stream");
+
+        socket.onopen = function () {
+            console.log("Ligado à AISStream via Browser!");
+            const subscriptionMessage = {
+                APIKey: "API-KEY", // Coloca aqui a tua chave
+                BoundingBoxes: [[[38.45, -9.55], [38.80, -9.00]]], // Caixa de Lisboa
+                FilterMessageTypes: ["PositionReport"]
+            };
+            socket.send(JSON.stringify(subscriptionMessage));
+        };
+
+        socket.onmessage = function (event) {
+            // Função auxiliar que processa a informação depois de garantir que é texto
+            const handleData = (jsonString) => {
+                try {
+                    const data = JSON.parse(jsonString);
+                    
+                    if (data.MessageType === "PositionReport") {
+                        const report = data.Message.PositionReport;
+                        const metadata = data.MetaData || {};
+                        const shipName = metadata.ShipName ? metadata.ShipName.trim() : "Desconhecido";
+                        
+                        // Atualiza o navio no mapa
+                        updateShip(
+                            report.UserID, 
+                            shipName, 
+                            report.Latitude, 
+                            report.Longitude, 
+                            report.Sog, 
+                            report.Cog
+                        );
+                    }
+                } catch (err) {
+                    console.error("Erro ao ler o JSON: ", err);
+                }
+            };
+
+            // Verifica se o browser recebeu um Blob (binário) ou texto direto
+            if (event.data instanceof Blob) {
+                event.data.text().then(text => handleData(text));
+            } else {
+                handleData(event.data);
+            }
+        };
+    </script>
+</body>
+</html>
